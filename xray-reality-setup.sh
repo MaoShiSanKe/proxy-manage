@@ -36,12 +36,21 @@ echo "=== [3/6] 生成配置密钥 ==="
 
 UUID=$($XRAY_BIN uuid)
 
-# x25519 输出格式：
-#   Private key: <key>
-#   Public key:  <key>
+# x25519 输出格式历史变化：
+#   旧版 (<v25.3.6):  "Private key: X"  /  "Public key: X"
+#   新版 (>=v25.3.6): "PrivateKey: X"   /  "Password: X"  /  "Hash32: X"
+#   更新版:           "PrivateKey: X"   /  "Password (PublicKey): X"
+# 兼容全部格式：私钥取含 "PrivateKey" 或 "Private key" 的行；
+# 公钥取含 "Public key" 或 "Password" 的行（Hash32 不是公钥，排除）
 X25519=$($XRAY_BIN x25519)
-PRIVATE_KEY=$(echo "$X25519" | awk '/Private key:/{print $NF}')
-PUBLIC_KEY=$(echo  "$X25519" | awk '/Public key:/{print $NF}')
+PRIVATE_KEY=$(echo "$X25519" | grep -i "private" | awk '{print $NF}')
+PUBLIC_KEY=$(echo  "$X25519" | grep -i "public\|password" | grep -iv "hash" | awk '{print $NF}')
+
+if [[ -z "$PRIVATE_KEY" || -z "$PUBLIC_KEY" ]]; then
+  echo "[ERROR] x25519 密钥解析失败，原始输出如下："
+  echo "$X25519"
+  exit 1
+fi
 
 SHORT_ID_1=$(openssl rand -hex 4)          # 8 位
 SHORT_ID_2=$(openssl rand -hex 8)          # 16 位
